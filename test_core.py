@@ -9,8 +9,8 @@ context = zmq.Context()
 
 
 @contextmanager
-def node_at(port):
-    n = Node(port)
+def node_at(port, data=None):
+    n = Node(port, data=data)
     n.start()
     try:
         yield n
@@ -35,10 +35,7 @@ def test_get_set():
 
 
 def test_update_with_neighbors():
-    with node_at(5456) as A, node_at(5457) as B:
-        # Give each a bit of data
-        A.data[1] = 'one'
-        B.data[2] = 'two'
+    with node_at(5456, {1: 'one'}) as A, node_at(5457, {2: 'two'}) as B:
 
         # add B to A's neighbor list
         A.neighbors[B.url] = set()
@@ -50,3 +47,11 @@ def test_update_with_neighbors():
         assert B.url in A.neighbors
         assert 2 in A.neighbors[B.url]
         assert 1 in B.neighbors[A.url]
+
+def test_big_dict():
+    with node_at(5458, {1: 'one'}) as A, node_at(5459, {2: 'two'}) as B:
+        A.neighbors[B.url] = {2}
+        bd = BigDict(A)
+        assert bd[1] == 'one'
+        assert bd[2] == 'two'
+

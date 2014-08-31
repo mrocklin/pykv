@@ -1,7 +1,7 @@
 import socket
 import zmq
-from toolz import curry, merge, partial
-from toolz.curried import valmap, pipe, merge_with
+from toolz import curry, merge, partial, first, second
+from toolz.curried import valmap, pipe, merge_with, groupby, map
 from toolz.compatibility import range
 import dill
 import json
@@ -127,3 +127,39 @@ class Node(object):
         sock.connect(self.url)
         sock.send(serialize('close'))
         self._stop = True
+
+    def catalog(self):
+        acquisitions = ((url, key) for url, keys in self.neighbors.items()
+                                   for key in keys)
+
+        return pipe(acquisitions, groupby(second),
+                                  valmap(map(first)),
+                                  valmap(set))
+
+class BigDict(object):
+    """ Dict interface to distributed kv-store
+
+    Parameters
+    ----------
+
+    node: Node
+        An entry point to the kv network
+    """
+    def __init__(self, node):
+        self.node = node
+
+    def get(self, key):
+        if key in self.node.data:
+            return self.node.data[key]
+        else:
+            cat = self.node.catalog()
+            sock = context.socket(zmq.REQ)
+            url = first(cat[key])
+            sock.connect(url)
+            request = serialize(('get', key))
+            sock.send(request)
+            response = deserialize(sock.recv())
+            return response
+
+    def __getitem__(self, key):
+        return self.get(key)
