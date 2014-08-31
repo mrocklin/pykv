@@ -51,7 +51,13 @@ def test_update_with_neighbors():
 def test_big_dict():
     with node_at(5458, {1: 'one'}) as A, node_at(5459, {2: 'two'}) as B:
         A.neighbors[B.url] = {2}
-        bd = BigDict(A)
-        assert bd[1] == 'one'
-        assert bd[2] == 'two'
+        dA = BigDict(A)
+        assert dA[1] == 'one'
+        assert dA[2] == 'two'
+
+        dA[3] = 'three'
+        A.update()
+
+        dB = BigDict(B)
+        assert dB[3] == 'three'
 
