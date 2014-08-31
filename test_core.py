@@ -11,27 +11,26 @@ context = zmq.Context()
 @contextmanager
 def node_at(port):
     n = Node(port)
-    thread = threading.Thread(target=n.event_loop)
-    thread.start()
+    n.start()
     try:
         yield n
     finally:
-        thread._Thread__stop()
         n.server.close()
+        n.stop()
 
 
 def test_get_set():
     with node_at(5455) as node:
         socket = context.socket(zmq.REQ)
         socket.connect('tcp://localhost:5455')
+
         socket.send_json(('set', 'key1', 'value1'))
-        node.handle()
         assert socket.recv_json() == 'OK'
+
         socket.send_json(('set', 'key2', 'value2'))
-        node.handle()
         assert socket.recv_json() == 'OK'
+
         socket.send_json(('get', 'key1'))
-        node.handle()
         assert socket.recv_json() == 'value1'
 
 

@@ -5,6 +5,7 @@ from toolz.curried import valmap, pipe, merge_with
 from toolz.compatibility import range
 import dill
 import json
+import threading
 from sys import stderr
 
 context = zmq.Context()
@@ -53,11 +54,6 @@ class Node(object):
             func = getattr(self, op.replace('-', '_'))
             response = func(**request)
         self.server.send(serialize(response))
-
-    def event_loop(self):
-        """ Keep handling messages on our server/input socket """
-        while True:
-            self.handle()
 
     def get(self, key):
         return self.data.get(key)
@@ -119,3 +115,15 @@ class Node(object):
 
         return merge(valmap(list, self.neighbors),
                      {self.url: list(self.data.keys())})
+
+    def event_loop(self):
+        """ Keep handling messages on our server/input socket """
+        while True:
+            self.handle()
+
+    def start(self):
+        self.thread = threading.Thread(target=self.event_loop)
+        self.thread.start()
+
+    def stop(self):
+        self.thread._Thread__stop()
