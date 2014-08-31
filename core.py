@@ -17,8 +17,6 @@ deserialize = json.loads
 
 union = lambda L: set.union(*L)
 
-log = open('log', 'w')
-
 class Node(object):
     """
 
@@ -43,9 +41,13 @@ class Node(object):
 
     def handle(self):
         """ Receive message, dispatch internally, send response """
+        if self.server.closed:
+            raise Exception()
         request = deserialize(self.server.recv())
-        log.write('%s: %s\n' % (self.url, request))
-        log.flush()
+        if request == 'close':
+            self._stop = True
+            self.server.send(serialize('Closing'))
+            return
         if isinstance(request, (tuple, list)):
             func = getattr(self, request[0].replace('-', '_'))
             response = func(*request[1:])
@@ -80,8 +82,6 @@ class Node(object):
             sock = context.socket(zmq.REQ)
             sock.connect(neighbor)
             socks.append(sock)
-        log.write('%s: created sockets' % self.url)
-        log.flush()
 
         # The information we know about that we want to share with everyone
         neighbors = merge({self.url: self.data.keys()},
@@ -91,13 +91,9 @@ class Node(object):
         # Send that information
         for sock in socks:
             sock.send(serialize(('share_neighbors', neighbors)))
-        log.write('%s: sent share_neighbors messages\n' % self.url)
-        log.flush()
 
         # Listen for return information and merge it with our own
         for sock in socks:
-            log.write('%s: waiting on %s\n' % (self.url, sock))
-            log.flush()
             self.neighbors = pipe(sock.recv(),
                                   deserialize,
                                   valmap(set),
@@ -118,7 +114,8 @@ class Node(object):
 
     def event_loop(self):
         """ Keep handling messages on our server/input socket """
-        while True:
+        self._stop = False
+        while not self._stop:
             self.handle()
 
     def start(self):
@@ -126,4 +123,7 @@ class Node(object):
         self.thread.start()
 
     def stop(self):
-        self.thread._Thread__stop()
+        sock = context.socket(zmq.REQ)
+        sock.connect(self.url)
+        sock.send(serialize('close'))
+        self._stop = True

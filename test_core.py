@@ -15,14 +15,14 @@ def node_at(port):
     try:
         yield n
     finally:
-        n.server.close()
         n.stop()
 
 
 def test_get_set():
-    with node_at(5455) as node:
+    port = 5465
+    with node_at(port) as node:
         socket = context.socket(zmq.REQ)
-        socket.connect('tcp://localhost:5455')
+        socket.connect('tcp://localhost:%d' % port)
 
         socket.send_json(('set', 'key1', 'value1'))
         assert socket.recv_json() == 'OK'
@@ -35,18 +35,18 @@ def test_get_set():
 
 
 def test_update_with_neighbors():
-    with node_at(5456) as A:
-        with node_at(5457) as B:
-            # Give each a bit of data
-            A.data[1] = 'one'
-            B.data[2] = 'two'
+    with node_at(5456) as A, node_at(5457) as B:
+        # Give each a bit of data
+        A.data[1] = 'one'
+        B.data[2] = 'two'
 
-            # add B to A's neighbor list
-            A.neighbors[B.url] = set()
+        # add B to A's neighbor list
+        A.neighbors[B.url] = set()
 
-            # Share between neighbors
-            A.update()
+        # Share between neighbors
+        A.update()
 
-            assert A.url in B.neighbors
-            assert B.url in A.neighbors
-            assert 2 in A.neighbors[B.url]
+        assert A.url in B.neighbors
+        assert B.url in A.neighbors
+        assert 2 in A.neighbors[B.url]
+        assert 1 in B.neighbors[A.url]
